@@ -19,7 +19,7 @@ use strict;
 use warnings;
 
 our $VERSION = '0.16';
-my $DEBUG = 0;
+our $DEBUG = 0;
 
 use File::Spec;
 use File::Temp;
