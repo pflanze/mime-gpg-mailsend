@@ -99,11 +99,11 @@ use Chj::IO::Command;
 use Chj::xperlfunc ();
 
 sub mime_sign {
-  local our ($self,$entity) = @_;
+  my ($self,$entity) = @_;
   Warn_check_class ($entity,"MIME::Entity");
 
   $entity->make_multipart;
-  local our $workingentity = $entity;
+  my $workingentity = $entity;
   if ($entity->parts > 1) {
     $workingentity = MIME::Entity->build(Type => $entity->head->mime_attr("Content-Type"));
     $workingentity->add_part($_) for ($entity->parts);
@@ -111,8 +111,8 @@ sub mime_sign {
     $entity->add_part($workingentity);
   }
 
-  local our $gpgoutputfile= Chj::xtmpfile::xtmpfile;
-  local our $gpg_out= Chj::IO::Command->new_receiver
+  my $gpgoutputfile= Chj::xtmpfile::xtmpfile;
+  my $gpg_out= Chj::IO::Command->new_receiver
     (sub {
 	 $gpgoutputfile->xdup2(1);
 	 Chj::xperlfunc::xexec
@@ -122,7 +122,7 @@ sub mime_sign {
 	     );
      });
 
-  local our $plaintext = (($workingentity eq $entity) ?
+  my $plaintext = (($workingentity eq $entity) ?
 		   $entity->parts(0)->as_string
 		   :
 		   $workingentity->as_string);
@@ -140,10 +140,10 @@ sub mime_sign {
 #  print "<----\n";
 
   $gpg_out->xprint ($plaintext);
-  local our $return= $gpg_out->xfinish;
+  my $return= $gpg_out->xfinish;
 
   $gpgoutputfile ->xrewind; # required.
-  local our @signature  = <$gpgoutputfile>;
+  my @signature  = <$gpgoutputfile>;
   $gpgoutputfile->xclose;
 
   #$self->{last_message} = \@error_output;   we don't have this anymore
@@ -161,7 +161,6 @@ sub mime_sign {
 # used md5.  For now, until we can detect which type was used, the end
 # user should read the source code, notice this comment, and insert
 # the appropriate value themselves.
-  use Chj::repl;repl;
 
   return $return;
 }
