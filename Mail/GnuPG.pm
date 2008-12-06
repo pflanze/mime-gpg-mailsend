@@ -142,6 +142,7 @@ sub mime_sign {
   $gpg_out->xprint ($plaintext);
   local our $return= $gpg_out->xfinish;
 
+  $gpgoutputfile ->xrewind; # required.
   local our @signature  = <$gpgoutputfile>;
   $gpgoutputfile->xclose;
 
