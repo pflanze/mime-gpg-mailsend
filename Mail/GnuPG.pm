@@ -22,7 +22,7 @@ use strict;
 use warnings;
 
 our $VERSION = '0.15';
-my $DEBUG = 0;
+our $DEBUG = 0;
 
 use GnuPG::Interface;
 use File::Spec;
