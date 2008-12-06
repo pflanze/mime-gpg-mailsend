@@ -23,8 +23,6 @@ our $DEBUG = 0;
 
 use MIME::Entity;
 use Mail::Address;
-use IO::Select;
-use Errno qw(EPIPE);
 use Carp 'shortmess';
 
 our $show_type_warnings=1;
@@ -274,111 +272,6 @@ sub is_encrypted {
   return 0;
 }
 
-# interleave reads and writes
-# input parameters: 
-#  $rhandles - array ref with a list of file handles for reading
-#  $whandles - array ref with a list of file handles for writing
-#  $wbuf_of  - hash ref indexed by the stringified handles
-#              containing the data to write
-# return value:
-#  $rbuf_of  - hash ref indexed by the stringified handles
-#              containing the data that has been read
-#
-# read and write errors due to EPIPE (gpg exit) are skipped silently on the
-# assumption that gpg will explain the problem on the error handle
-#
-# other errors cause a non-fatal warning, processing continues on the rest
-# of the file handles
-#
-# NOTE: all the handles get closed inside this function
-
-sub _communicate {
-    my $blocksize = 2048;
-    my ($rhandles, $whandles, $wbuf_of) = @_;
-    my $rbuf_of = {};
-
-    # the current write offsets, again indexed by the stringified handle
-    my $woffset_of;
-
-    my $reader = IO::Select->new;
-    for (@$rhandles) {
-        $reader->add($_);
-        $rbuf_of->{$_} = '';
-    }
-
-    my $writer = IO::Select->new;
-    for (@$whandles) {
-        die("no data supplied for handle " . fileno($_)) if !exists $wbuf_of->{$_};
-        if ($wbuf_of->{$_}) {
-            $writer->add($_);
-        } else { # nothing to write
-            close $_;
-        }
-    }
-
-    # we'll handle EPIPE explicitly below
-    local $SIG{PIPE} = 'IGNORE';
-
-    while ($reader->handles || $writer->handles) {
-        my @ready = IO::Select->select($reader, $writer, undef, undef);
-        if (!@ready) {
-            die("error doing select: $!");
-        }
-        my ($rready, $wready, $eready) = @ready;
-        if (@$eready) {
-            die("select returned an unexpected exception handle, this shouldn't happen");
-        }
-        for my $rhandle (@$rready) {
-            my $n = fileno($rhandle);
-            my $count = sysread($rhandle, $rbuf_of->{$rhandle},
-                                $blocksize, length($rbuf_of->{$rhandle}));
-            warn("read $count bytes from handle $n") if $DEBUG;
-            if (!defined $count) { # read error
-                if ($!{EPIPE}) {
-                    warn("read failure (gpg exited?) from handle $n: $!")
-                        if $DEBUG;
-                } else {
-                    warn("read failure from handle $n: $!");
-                }
-                $reader->remove($rhandle);
-                close $rhandle;
-                next;
-            }
-            if ($count == 0) { # EOF
-                warn("read done from handle $n") if $DEBUG;
-                $reader->remove($rhandle);
-                close $rhandle;
-                next;
-            }
-        }
-        for my $whandle (@$wready) {
-            my $n = fileno($whandle);
-            $woffset_of->{$whandle} = 0 if !exists $woffset_of->{$whandle};
-            my $count = syswrite($whandle, $wbuf_of->{$whandle},
-                                 $blocksize, $woffset_of->{$whandle});
-            if (!defined $count) {
-                if ($!{EPIPE}) { # write error
-                    warn("write failure (gpg exited?) from handle $n: $!")
-                        if $DEBUG;
-                } else {
-                    warn("write failure from handle $n: $!");
-                }
-                $writer->remove($whandle);
-                close $whandle;
-                next;
-            }
-            warn("wrote $count bytes to handle $n") if $DEBUG;
-            $woffset_of->{$whandle} += $count;
-            if ($woffset_of->{$whandle} >= length($wbuf_of->{$whandle})) {
-                warn("write done to handle $n") if $DEBUG;
-                $writer->remove($whandle);
-                close $whandle;
-                next;
-            }
-        }
-    }
-    return $rbuf_of;
-}
 
 # FIXME: there's no reason why is_signed and is_encrypted couldn't be
 # static (class) methods, so maybe we should support that.
