@@ -48,13 +48,9 @@ our $headers=Chj::Mail::SimpleHead->new_from_fh ($m);
 
 our $bfh= xopen_read $bodyfile;
 
-use 
-my $passphrase= 
-
 use lib "./lib";# my hacked version of Mail::GnuPG
 use Mail::GnuPG;
-our $mg = Mail::GnuPG->new (key=> $key_id
-			    passphrase=> $passphrase);
+our $mg = Mail::GnuPG->new (key=> $key_id);
 
 use MIME::Entity;
 our $copyheader= sub ( $ ) {
