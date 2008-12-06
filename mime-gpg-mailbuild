@@ -74,7 +74,7 @@ use Data::Dumper;
 
 our $returncode = $mg->mime_sign($entity); # destructive
 $returncode == 0
-  or die "$mg got error: ".Dumper($$mg{last_message});
+  or die "$mg got error:\n".join("",@{$$mg{last_message}})."\n ";
 
 
 #use Chj::ruse;
