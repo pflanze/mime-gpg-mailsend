@@ -148,10 +148,6 @@ sub mime_sign {
 
   waitpid $pid, 0;
   my $return = $?;
-   $return = 0 if $return == -1;
-
-  my $exit_value  = $return >> 8;
-
 
   $self->{last_message} = \@error_output;
 
@@ -169,7 +165,7 @@ sub mime_sign {
 # user should read the source code, notice this comment, and insert
 # the appropriate value themselves.
 
-  return $exit_value;
+  return $return;
 }
 
 
