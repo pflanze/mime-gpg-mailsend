@@ -548,6 +548,7 @@ sub mime_sign {
   $gpg_out->xprint ($plaintext);
   my $return= $gpg_out->xfinish;
 
+  $gpgoutputfile ->xrewind; # required.
   my @signature  = <$gpgoutputfile>;
   $gpgoutputfile->xclose;
 
