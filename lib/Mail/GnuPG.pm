@@ -744,10 +744,6 @@ sub _ascii_encrypt {
   
   waitpid $pid, 0;
   my $return = $?;
-   $return = 0 if $return == -1;
-
-  my $exit_value  = $return >> 8;
-  
 
   $self->{last_message} = [@error_output];
 
@@ -755,7 +751,7 @@ sub _ascii_encrypt {
   $io->print (join('',@ciphertext));
   $io->close;
 
-  return $exit_value;
+  return $return;
 }
 
 =head2 mime_encrypt
