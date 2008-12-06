@@ -58,7 +58,7 @@ sub Warn_check_class ( $ $ ) {
   Create a new Mail::GnuPG instance.
 
  Arguments:
-   Paramhash...
+   Parameter key/value pairs:
 
    key    => gpg key id
    keydir => gpg configuration/key directory
