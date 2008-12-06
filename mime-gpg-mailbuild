@@ -1,0 +1,84 @@
+#!/usr/bin/perl -w
+
+# Sat Dec  6 18:56:25 CET 2008
+(my $email='christian-novo%jaeger,mine,nu')=~ tr/%,/@./;
+
+use strict;
+
+$0=~ /(.*?)([^\/]+)\z/s or die "?";
+my ($mydir, $myname)=($1,$2);
+sub usage {
+    print STDERR map{"$_\n"} @_ if @_;
+    print "$myname headers body.txt
+
+  print mime message with given headers and gpg encrypted body text as
+  a mime part.
+
+  (See also: send_as_mail, mime-parser, (mime-worddecoder),
+  Chj::Mail::SimpleHead, .. -- actually using Chj::Mail::SimpleHead here)
+
+  (Christian Jaeger <$email>)
+";
+exit (@_ ? 1 : 0);
+}
+
+use Getopt::Long;
+our $verbose=0;
+GetOptions("verbose"=> \$verbose,
+	   "help"=> sub{usage},
+	   ) or exit 1;
+usage unless @ARGV==2;
+
+our ($headersfile,$bodyfile)=@ARGV;
+
+use Chj::Mail::SimpleHead;
+use Chj::xopen ':all';
+
+our $m= xopen_read $headersfile;
+our $headers=Chj::Mail::SimpleHead->new_from_fh ($m);
+{
+    my $rest= $m->xcontent;
+    (!defined $rest)
+      or $rest=~ /^\s*\z/s
+	or die "rest of '$headersfile' is supposed to be empty, but isn't: '$rest'";
+}
+
+
+our $bfh= xopen_read $bodyfile;
+
+use Mail::GPG;
+our $mg = Mail::GPG->new;
+
+use MIME::Entity;
+our $copyheader= sub ( $ ) {
+    my ($headername)=@_;
+    my $value= $headers->decodedheader ($headername)
+      or die "missing header '$headername'";#hm?
+    ($headername, $value)
+};
+
+our $entity= MIME::Entity->build
+  (
+   &$copyheader ("From"),
+   &$copyheader ("Subject"),
+   #Data     => [ "Hiho, a nice encrypted mail" ],
+   Data=> $bfh->xcontent, #ok? why array?.
+   Encoding => "quoted-printable",
+   Charset  => "iso-8859-1",
+  );
+
+our $key_id= "4ECBDF801FE692DA";##
+
+our $signed_entity = $mg->mime_sign
+  (
+   entity     => $entity,
+   key_id     => $key_id,
+   #password   => 'topsecret', EHR REALLY.gosh ehrlich.grrrr. swap etc hm.GRR.  ah kann mandas weglassn?
+   #recipients => [ 'niceguy@zyn.de' ], nicht für encrypt right
+  );
+
+
+
+#use Chj::ruse;
+use Chj::Backtrace;
+use Chj::repl; repl;
