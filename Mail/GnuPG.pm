@@ -117,7 +117,8 @@ sub mime_sign {
 	 $gpgoutputfile->xdup2(1);
 	 Chj::xperlfunc::xexec
 	     ("gpg",
-	      "--clearsign",
+	      "--detach-sign",
+	      "--armor", # required
 	      ($$self{key} ? ("--local-user",$$self{key}) : ()),
 	     );
      });
