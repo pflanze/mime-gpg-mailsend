@@ -33,6 +33,25 @@ use MIME::Parser;
 use Mail::Address;
 use IO::Select;
 use Errno qw(EPIPE);
+use Carp 'shortmess';
+
+our $show_type_warnings=1;
+our $seen_warnings={};
+sub Warn_check_class ( $ $ ) {
+    return unless $show_type_warnings;
+    my ($obj, $class)=@_;
+    ref $obj and $obj->isa($class)
+      or do {
+	  my $msg=shortmess ("");
+	  if ($$seen_warnings{$msg}) {
+	      #ignore
+	  } else {
+	      $$seen_warnings{$msg}=1;
+	      warn __PACKAGE__." warning (shown only once per location): expected an object of class $class, but got: '$obj'".$msg;
+	  }
+      };
+}
+
 
 =head2 new
 
@@ -116,14 +135,11 @@ sub _set_options {
 
 sub decrypt {
   my ($self, $message) = @_;
+  Warn_check_class ($message,"MIME::Entity");
+
   my $ciphertext = "";
 
   $self->{last_message} = [];
-
-  unless (ref $message && $message->isa("MIME::Entity")) {
-    die "decrypt only knows about MIME::Entitys right now";
-    return 255;
-  }
 
   my $armor_message = 0;
   if ($message->effective_type =~ m!multipart/encrypted!) {
@@ -233,10 +249,7 @@ sub decrypt {
 
 sub get_decrypt_key {
   my ($self, $message) = @_;
-
-  unless (ref $message && $message->isa("MIME::Entity")) {
-    die "decrypt only knows about MIME::Entitys right now";
-  }
+  Warn_check_class ($message,"MIME::Entity");
 
   my $ciphertext;
 
@@ -358,16 +371,12 @@ sub get_decrypt_key {
 # Verify RFC2015/RFC3156 email
 sub verify {
   my ($self, $message) = @_;
+  Warn_check_class ($message,"MIME::Entity");
 
   my $ciphertext = "";
   my $sigtext    = "";
 
   $self->{last_message} = [];
-
-  unless (ref $message && $message->isa("MIME::Entity")) {
-    die "VerifyMessage only knows about MIME::Entitys right now";
-    return 255;
-  }
 
   if ($message->effective_type =~ m!multipart/signed!) {
     die "multipart/signed with more than two parts"
@@ -524,9 +533,7 @@ sub has_public_key {
 
 sub mime_sign {
   my ($self,$entity) = @_;
-
-  die "Not a mime entity"
-    unless $entity->isa("MIME::Entity");
+  Warn_check_class ($entity,"MIME::Entity");
 
   $entity->make_multipart;
   my $workingentity = $entity;
@@ -625,9 +632,7 @@ sub mime_sign {
 
 sub clear_sign {
   my ($self, $entity) = @_;
-  
-  die "Not a mime entity"
-    unless $entity->isa("MIME::Entity");
+  Warn_check_class ($entity,"MIME::Entity");
 
   my $body = $entity->bodyhandle;
   
@@ -723,9 +728,7 @@ sub ascii_signencrypt {
 
 sub _ascii_encrypt {
   my ($self, $entity, $sign, @recipients) = @_;
-  
-  die "Not a mime entity"
-    unless $entity->isa("MIME::Entity");
+  Warn_check_class ($entity,"MIME::Entity");
 
   my $body = $entity->bodyhandle;
   
@@ -821,9 +824,7 @@ sub mime_signencrypt {
 
 sub _mime_encrypt {
   my ($self,$sign,$entity,@recipients) = @_;
-
-  die "Not a mime entity"
-    unless $entity->isa("MIME::Entity");
+  Warn_check_class ($entity,"MIME::Entity");
 
   my $workingentity = $entity;
   $entity->make_multipart;
