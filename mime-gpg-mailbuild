@@ -5,6 +5,8 @@
 
 use strict;
 
+our $key_id= "4ECBDF801FE692DA";##
+
 $0=~ /(.*?)([^\/]+)\z/s or die "?";
 my ($mydir, $myname)=($1,$2);
 sub usage {
@@ -46,8 +48,8 @@ our $headers=Chj::Mail::SimpleHead->new_from_fh ($m);
 
 our $bfh= xopen_read $bodyfile;
 
-use Mail::GPG;
-our $mg = Mail::GPG->new;
+use Mail::GnuPG;
+our $mg = Mail::GnuPG->new (key=> $key_id);
 
 use MIME::Entity;
 our $copyheader= sub ( $ ) {
@@ -67,16 +69,10 @@ our $entity= MIME::Entity->build
    Charset  => "iso-8859-1",
   );
 
-our $key_id= "4ECBDF801FE692DA";##
 
-our $signed_entity = $mg->mime_sign
-  (
-   entity     => $entity,
-   key_id     => $key_id,
-   #password   => 'topsecret', EHR REALLY.gosh ehrlich.grrrr. swap etc hm.GRR.  ah kann mandas weglassn?
-   #recipients => [ 'niceguy@zyn.de' ], nicht für encrypt right
-  );
-
+our $returncode = $mg->mime_sign($entity); # destructive
+$returncode == 0
+  or die "$mg got error: '$$mg{last_message}'";
 
 
 #use Chj::ruse;
