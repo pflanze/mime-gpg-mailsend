@@ -948,6 +948,7 @@ sub _mime_encrypt {
 
 sub is_signed {
   my ($self,$entity) = @_;
+  Warn_check_class ($entity,"MIME::Entity");
   return 1
     if (($entity->effective_type =~ m!multipart/signed!)
 	||
@@ -957,6 +958,7 @@ sub is_signed {
 
 sub is_encrypted {
   my ($self,$entity) = @_;
+  Warn_check_class ($entity,"MIME::Entity");
   return 1
     if (($entity->effective_type =~ m!multipart/encrypted!)
 	||
