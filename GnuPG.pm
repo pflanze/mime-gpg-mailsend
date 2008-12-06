@@ -498,6 +498,7 @@ sub has_public_key {
 
 use Chj::xtmpfile ();
 use Chj::IO::Command;
+use Chj::xperlfunc ();
 
 sub mime_sign {
   my ($self,$entity) = @_;
@@ -516,12 +517,14 @@ sub mime_sign {
 
   my $gpgoutputfile= Chj::xtmpfile::xtmpfile;
   my $gpg_out= Chj::IO::Command->new_receiver
-    ("gpg",
-     "--clearsign",
-     ($$self{key} ? ("--local-user",$$self{key}) : ()),
-     "--output", $gpgoutputfile->path,
-     "-",
-    );
+    (sub {
+	 $gpgoutputfile->xdup2(1);
+	 Chj::xperlfunc::xexec
+	     ("gpg",
+	      "--clearsign",
+	      ($$self{key} ? ("--local-user",$$self{key}) : ()),
+	     );
+     });
 
   # this passes in the plaintext
   my $plaintext;
