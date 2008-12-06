@@ -8,7 +8,7 @@ Mail::GnuPG - Process email with GPG.
 
   use Mail::GnuPG;
   my $mg = new Mail::GnuPG( key => 'ABCDEFGH' );
-  $ret = $mg->mime_sign( $MIMEObj, 'you@my.dom' );
+  $ret = $mg->mime_sign( $MIMEObj );
 
 =head1 DESCRIPTION
 
