@@ -564,13 +564,10 @@ sub mime_sign {
   my $pid = $gnupg->detach_sign( handles => $handles, $self->_agent_args );
   die "NO PASSPHRASE" unless defined $passphrase_fh;
 
-  # this passes in the plaintext
-  my $plaintext;
-  if ($workingentity eq $entity) {
-    $plaintext = $entity->parts(0)->as_string;
-  } else {
-    $plaintext = $workingentity->as_string;
-  }
+  my $plaintext = (($workingentity eq $entity) ?
+		   $entity->parts(0)->as_string
+		   :
+		   $workingentity->as_string);
 
   # according to RFC3156 all line endings MUST be CR/LF
   $plaintext =~ s/\x0A/\x0D\x0A/g;
