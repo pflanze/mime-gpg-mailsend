@@ -80,20 +80,6 @@ sub new {
   return $self;
 }
 
-sub _set_options {
-  my ($self,$gnupg) = @_;
-  $gnupg->options->meta_interactive( 0 );
-  $gnupg->options->hash_init( armor   => 1,
-			      ( defined $self->{keydir} ?
-				(homedir => $self->{keydir}) : () ),
-			      ( defined $self->{key} ?
-				( default_key => $self->{key} ) : () ),
-#			      ( defined $self->{passphrase} ?
-#				( passphrase => $self->{passphrase} ) : () ),
-			    );
-  $gnupg->call( $self->{gpg_path} ) if defined $self->{gpg_path};
-}
-
 
 =head2 decrypt
 
