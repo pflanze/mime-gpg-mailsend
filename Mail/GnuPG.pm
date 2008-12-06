@@ -22,7 +22,6 @@ our $VERSION = '0.15';
 our $DEBUG = 0;
 
 use MIME::Entity;
-use Mail::Address;
 use Carp 'shortmess';
 
 our $show_type_warnings=1;
@@ -76,56 +75,6 @@ sub new {
 }
 
 
-
-# Should this go elsewhere?  The Key handling stuff doesn't seem to
-# make sense in a Mail:: module.  
-my %key_cache;
-my $key_cache_age = 0;
-my $key_cache_expire = 60*60*30; # 30 minutes
-
-sub _rebuild_key_cache {
-  my $self = shift;
-  local $_;
-  %key_cache = ();
-  # sometimes the best tool for the job... is not perl
-  open(my $fh, "$self->{gpg_path} --list-public-keys --with-colons | cut -d: -f10|")
-    or die $!;
-  while(<$fh>) {
-    next unless $_;
-    # M::A may not parse the gpg stuff properly.  Cross fingers
-    my ($a) = Mail::Address->parse($_); # list context, please
-    $key_cache{$a->address}=1 if ref $a;
-  }
-}
-
-=head2 has_public_key
-
-Does the keyring have a public key for the specified email address? 
-
- FIXME: document better.  talk about caching.  maybe put a better
- interface in.
-
-=cut
-
-
-sub has_public_key {
-  my ($self,$address) = @_;
-
-  # cache aging is disabled until someone has enough time to test this
-  if (0) {
-    $self->_rebuild_key_cache() unless ($key_cache_age);
-
-    if ( $key_cache_age && ( time() - $key_cache_expire > $key_cache_age )) {
-      $self->_rebuild_key_cache();
-    }
-  }
-
-  $self->_rebuild_key_cache();
-
-  return 1 if exists $key_cache{$address};
-  return 0;
-
-}
 
 =head2 mime_sign
 
