@@ -12,9 +12,6 @@ Mail::GnuPG - Process email with GPG.
 
 =head1 DESCRIPTION
 
-Use GnuPG::Interface to process or create PGP signed or encrypted
-email.
-
 =cut
 
 use 5.006;
@@ -24,10 +21,8 @@ use warnings;
 our $VERSION = '0.15';
 our $DEBUG = 0;
 
-use GnuPG::Interface;
 use File::Spec;
 use File::Temp;
-use IO::Handle;
 use MIME::Entity;
 use MIME::Parser;
 use Mail::Address;
@@ -1107,8 +1102,6 @@ Please send all bugs/issues/patches to
 =head1 SEE ALSO
 
 L<perl>.
-
-GnuPG::Interface,
 
 MIME::Entity
 
