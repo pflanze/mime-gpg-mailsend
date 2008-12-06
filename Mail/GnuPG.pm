@@ -157,7 +157,7 @@ sub mime_sign {
 
   $entity->attach( Type => "application/pgp-signature",
 		   Disposition => "inline",
-		   Data => [@signature],
+		   Data => \@signature,
 		   Encoding => "7bit");
 
   $entity->head->mime_attr("Content-Type","multipart/signed");
