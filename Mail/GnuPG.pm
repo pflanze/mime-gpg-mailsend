@@ -93,6 +93,10 @@ sub new {
 =cut
 
 
+
+use Chj::xtmpfile ();
+use Chj::IO::Command;
+
 sub mime_sign {
   my ($self,$entity) = @_;
   Warn_check_class ($entity,"MIME::Entity");
@@ -106,19 +110,14 @@ sub mime_sign {
     $entity->add_part($workingentity);
   }
 
-  my $gnupg = GnuPG::Interface->new();
-  $self->_set_options( $gnupg );
-  my ( $input, $output, $error, $passphrase_fh, $status_fh )
-    = ( new IO::Handle, new IO::Handle,new IO::Handle,
-	new IO::Handle,new IO::Handle,);
-  my $handles = GnuPG::Handles->new( stdin      => $input,
-				     stdout     => $output,
-				     stderr     => $error,
-				     passphrase => $passphrase_fh,
-				     status     => $status_fh,
-				   );
-  my $pid = $gnupg->detach_sign( handles => $handles );
-  die "NO PASSPHRASE" unless defined $passphrase_fh;
+  my $gpgoutputfile= Chj::xtmpfile::xtmpfile;
+  my $gpg_out= Chj::IO::Command->new_receiver
+    ("gpg",
+     "--clearsign",
+     ($$self{key} ? ("--local-user",$$self{key}) : ()),
+     "--output", $gpgoutputfile->path,
+     "-",
+    );
 
   my $plaintext = (($workingentity eq $entity) ?
 		   $entity->parts(0)->as_string
@@ -136,20 +135,14 @@ sub mime_sign {
 #  warn($entity->as_string);
 #  print STDERR $plaintext;
 #  print "<----\n";
-  my $read = _communicate([$output, $error, $status_fh],
-                        [$input, $passphrase_fh],
-                        { $input => $plaintext,
-                          $passphrase_fh => $self->{passphrase}}
-             );
 
-  my @signature  = split(/^/m, $read->{$output});
-  my @error_output = split(/^/m, $read->{$error});
-  my @status_info  = split(/^/m, $read->{$status_fh});
+  $gpg_out->xprint ($plaintext);
+  my $return= $gpg_out->xfinish;
 
-  waitpid $pid, 0;
-  my $return = $?;
+  my @signature  = <$gpgoutputfile>;
+  $gpgoutputfile->xclose;
 
-  $self->{last_message} = \@error_output;
+  #$self->{last_message} = \@error_output;   we don't have this anymore
 
   $entity->attach( Type => "application/pgp-signature",
 		   Disposition => "inline",
