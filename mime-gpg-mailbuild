@@ -12,6 +12,8 @@ our $key_id= undef;
 
 my ($mydir, $myname);
 BEGIN {
+    use Chj::xrealpath;
+    $0= xrealpath $0;
     $0=~ /(.*?)([^\/]+)\z/s or die "?";
     ($mydir, $myname)=($1,$2);
 }
