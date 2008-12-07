@@ -53,17 +53,13 @@ use Mail::GnuPG;
 our $mg = Mail::GnuPG->new (key=> $key_id);
 
 use MIME::Entity;
-our $copyheader= sub ( $ ) {
-    my ($headername)=@_;
-    my $value= $headers->decodedheader ($headername)
-      or die "missing header '$headername'";#hm?
-    ($headername, $value)
-};
 
 our $entity= MIME::Entity->build
   (
    (map {
-       &$copyheader ($_)
+       defined (my $value= $headers->decodedheader ($_))
+	 or die "??";#well, multiheader cases maybe?.
+       ($_, $value)
    } sort keys %{$headers->headersHash} ), #yep sort order plays a role
    #Data     => [ "Hiho, a nice encrypted mail" ],
    Data=> $bfh->xcontent, #ok? why array?.
