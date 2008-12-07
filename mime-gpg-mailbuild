@@ -62,8 +62,9 @@ our $copyheader= sub ( $ ) {
 
 our $entity= MIME::Entity->build
   (
-   &$copyheader ("From"),
-   &$copyheader ("Subject"),
+   (map {
+       &$copyheader ($_)
+   } sort keys %{$headers->headersHash} ), #yep sort order plays a role
    #Data     => [ "Hiho, a nice encrypted mail" ],
    Data=> $bfh->xcontent, #ok? why array?.
    Encoding => "quoted-printable",
