@@ -20,7 +20,7 @@ BEGIN {
 
 sub usage {
     print STDERR map{"$_\n"} @_ if @_;
-    print "$myname headers body.txt [ outfile ]
+    print "$myname infile [ outfile ]
 
   create mime message from given headers and body, optionally signing
   the body in pgp/mime format.  It completes the headers with
@@ -33,8 +33,9 @@ sub usage {
   NOTE: header handling might not be unicode or even latin1 ready yet.
 
   Options:
-  -s | --sign   clearsign the given text in pgp/mime format.
-
+  -s | --sign  clearsign the given text in pgp/mime format.
+  -2           expect two separate infiles, headers and body. The
+               outfile argument becomes the third argument in this case.
 
   (See also: send_as_mail, mime-parser, (mime-worddecoder),
   Chj::Mail::SimpleHead, .. -- actually using Chj::Mail::SimpleHead here)
@@ -47,13 +48,22 @@ exit (@_ ? 1 : 0);
 use Getopt::Long;
 our $verbose=0;
 our $opt_sign;
+our $opt_2;
 GetOptions("verbose"=> \$verbose,
 	   "help"=> sub{usage},
 	   "sign"=>\$opt_sign,
+	   "2"=> \$opt_2,
 	   ) or exit 1;
-usage unless @ARGV==2 or @ARGV==3;
+usage unless @ARGV>=1 and @ARGV<=3;
 
-our ($headersfile,$bodyfile,$maybe_outfile)=@ARGV;
+our ($headersfile,$maybe_bodyfile,$maybe_outfile);
+if ($opt_2) {
+    @ARGV>=2 and @ARGV<=3 or usage;
+    ($headersfile,$maybe_bodyfile,$maybe_outfile)=@ARGV;
+} else {
+    @ARGV>=1 and @ARGV<=2 or usage;
+    ($headersfile,$maybe_outfile)=@ARGV;
+}
 
 
 # ---- head data ----------------
@@ -63,12 +73,20 @@ use Chj::xopen ':all';
 
 our $m= xopen_read $headersfile;
 our $headers=Chj::Mail::SimpleHead->new_from_fh ($m);
-{
+our $body= do {
     my $rest= $m->xcontent;
-    (!defined $rest)
-      or $rest=~ /^\s*\z/s
-	or die "rest of '$headersfile' is supposed to be empty, but isn't: '$rest'";
-}
+    if ($opt_2) {
+	(!defined $rest)
+	  or $rest=~ /^\s*\z/s
+	    or die "rest of '$headersfile' is supposed to be empty, but isn't: '$rest'";
+	my $in= xopen_read $maybe_bodyfile;
+	my $rf= $in->xcontentref;
+	$in->xclose;
+	$$rf
+    } else {
+	$rest
+    }
+};
 
 use Chj::Mail::Return_path;
 our $return_path=
@@ -98,8 +116,6 @@ our $date=
 
 # ---- read body and combine with head ----------
 
-our $bfh= xopen_read $bodyfile;
-
 use MIME::Entity;
 
 our $entity= MIME::Entity->build
@@ -127,7 +143,7 @@ our $entity= MIME::Entity->build
    'From'=> $from,
    'Date'=> $date,
    #Data     => [ "Hiho, a nice encrypted mail" ],
-   Data=> $bfh->xcontent, #ok? why array?.
+   Data=> $body,
    Encoding => "quoted-printable",
    Charset  => "iso-8859-1",###?todo.
   );
