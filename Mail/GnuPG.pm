@@ -155,6 +155,7 @@ sub mime_sign {
 		   Encoding => "7bit");
 
   $entity->head->mime_attr("Content-Type","multipart/signed");
+  $entity->head->mime_attr("Content-Type.micalg","pgp-sha1");
   $entity->head->mime_attr("Content-Type.protocol","application/pgp-signature");
 #  $entity->head->mime_attr("Content-Type.micalg","pgp-md5");
 # Richard Hirner notes that Thunderbird/Enigmail really wants a micalg
