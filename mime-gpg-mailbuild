@@ -33,6 +33,9 @@ usage unless @ARGV==2;
 
 our ($headersfile,$bodyfile)=@ARGV;
 
+
+# ---- head data ----------------
+
 use Chj::Mail::SimpleHead;
 use Chj::xopen ':all';
 
@@ -45,22 +48,52 @@ our $headers=Chj::Mail::SimpleHead->new_from_fh ($m);
 	or die "rest of '$headersfile' is supposed to be empty, but isn't: '$rest'";
 }
 
+use Chj::Mail::Return_path;
+our $return_path=
+  ($headers->decodedheader("return-path")
+   or
+   Return_path($headers->decodedheader("from")));
+
+use Chj::Mail::Create_messageid;
+our $messageid=
+  ($headers->decodedheader("message-id") #hm or would we want to override it?
+   or
+   Create_messageid ($return_path));
+
+use Chj::Mailfrom qw(mailfrom);
+our $from=
+  ($headers->decodedheader("from")
+   or
+   mailfrom);
+
+
+# ---- read body and combine with head ----------
 
 our $bfh= xopen_read $bodyfile;
-
-use lib "./lib";# my hacked version of Mail::GnuPG
-use CHJ::Mail::GnuPG;
-our $mg = CHJ::Mail::GnuPG->new (key=> $key_id);
 
 use MIME::Entity;
 
 our $entity= MIME::Entity->build
   (
-   (map {
-       defined (my $value= $headers->decodedheader ($_))
-	 or die "??";#well, multiheader cases maybe?.
-       ($_, $value)
-   } sort keys %{$headers->headersHash} ), #yep sort order plays a role
+   (
+    map {
+	defined (my $value= $headers->decodedheader ($_))
+	  or die "??";#well, multiheader cases maybe?.
+	($_, $value)
+    }
+    grep {
+	($_ ne "return-path"
+	 and
+	 $_ ne "message-id"
+	 and
+	 $_ ne "from"
+	)
+    }
+    sort keys %{$headers->headersHash} #yep sort order plays a role
+   ),
+   'Return-path'=> $return_path,
+   'Message-id'=> $messageid,
+   'From'=> $from,
    #Data     => [ "Hiho, a nice encrypted mail" ],
    Data=> $bfh->xcontent, #ok? why array?.
    Encoding => "quoted-printable",
@@ -69,6 +102,12 @@ our $entity= MIME::Entity->build
 
 
 if(0){
+
+# ---- sign ----------------------
+use lib "./lib";# my hacked version of Mail::GnuPG
+use CHJ::Mail::GnuPG;
+our $mg = CHJ::Mail::GnuPG->new (key=> $key_id);
+
 our $returncode = $mg->mime_sign($entity); # destructive
 $returncode == 0
   or die "$mg got error:\n".join("",@{$$mg{last_message}})."\n ";
