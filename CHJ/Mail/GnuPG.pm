@@ -1,13 +1,13 @@
-package Mail::GnuPG;
+package CHJ::Mail::GnuPG;
 
 =head1 NAME
 
-Mail::GnuPG - Process email with GPG.
+CHJ::Mail::GnuPG - Process email with GPG.
 
 =head1 SYNOPSIS
 
-  use Mail::GnuPG;
-  my $mg = new Mail::GnuPG( key => 'ABCDEFGH' );
+  use CHJ::Mail::GnuPG;
+  my $mg = new CHJ::Mail::GnuPG( key => 'ABCDEFGH' );
   $ret = $mg->mime_sign( $MIMEObj );
 
 =head1 DESCRIPTION
@@ -44,7 +44,7 @@ sub Warn_check_class ( $ $ ) {
 
 =head2 new
 
-  Create a new Mail::GnuPG instance.
+  Create a new CHJ::Mail::GnuPG instance.
 
  Arguments:
    Parameter key/value pairs:
@@ -245,12 +245,15 @@ GNU General Public License or the Artistic License for more details.
 
 =head1 AUTHOR
 
-Robert Spier
+Mail::GnuPG - Robert Spier
+CHJ::Mail::GnuPG - (temporary?) fork by Christian Jaeger
 
 =head1 BUGS/ISSUES/PATCHES
 
 Please send all bugs/issues/patches to
     bug-Mail-GnuPG@rt.cpan.org
+
+or if they concern CHJ::Mail::GnuPG, to christian at jaeger mine nu
 
 =head1 SEE ALSO
 
