@@ -11,10 +11,21 @@ $0=~ /(.*?)([^\/]+)\z/s or die "?";
 my ($mydir, $myname)=($1,$2);
 sub usage {
     print STDERR map{"$_\n"} @_ if @_;
-    print "$myname headers body.txt
+    print "$myname headers body.txt [ outfile ]
 
-  print mime message with given headers and gpg encrypted body text as
-  a mime part.
+  create mime message from given headers and body, optionally signing
+  the body in pgp/mime format.  It completes the headers with
+  return-path, from, and message-id headers if those are not present
+  in the given headers file.
+
+  If no outfile is given, prints to stdout.
+
+  Kind-of replaces send_as_mail.
+  NOTE: header handling might not be unicode or even latin1 ready yet.
+
+  Options:
+  -s | --sign   clearsign the given text in pgp/mime format.
+
 
   (See also: send_as_mail, mime-parser, (mime-worddecoder),
   Chj::Mail::SimpleHead, .. -- actually using Chj::Mail::SimpleHead here)
@@ -26,12 +37,14 @@ exit (@_ ? 1 : 0);
 
 use Getopt::Long;
 our $verbose=0;
+our $opt_sign;
 GetOptions("verbose"=> \$verbose,
 	   "help"=> sub{usage},
+	   "sign"=>\$opt_sign,
 	   ) or exit 1;
-usage unless @ARGV==2;
+usage unless @ARGV==2 or @ARGV==3;
 
-our ($headersfile,$bodyfile)=@ARGV;
+our ($headersfile,$bodyfile,$maybe_outfile)=@ARGV;
 
 
 # ---- head data ----------------
@@ -97,22 +110,32 @@ our $entity= MIME::Entity->build
    #Data     => [ "Hiho, a nice encrypted mail" ],
    Data=> $bfh->xcontent, #ok? why array?.
    Encoding => "quoted-printable",
-   Charset  => "iso-8859-1",
+   Charset  => "iso-8859-1",###?todo.
   );
 
 
-if(0){
+if ($opt_sign) {
 
-# ---- sign ----------------------
-use lib "./lib";# my hacked version of Mail::GnuPG
-use CHJ::Mail::GnuPG;
-our $mg = CHJ::Mail::GnuPG->new (key=> $key_id);
+    # ---- sign ----------------------
+    use lib "./lib";# my hacked version of Mail::GnuPG
+    use CHJ::Mail::GnuPG;
+    our $mg = CHJ::Mail::GnuPG->new (key=> $key_id);
 
-our $returncode = $mg->mime_sign($entity); # destructive
-$returncode == 0
-  or die "$mg got error:\n".join("",@{$$mg{last_message}})."\n ";
+    our $returncode = $mg->mime_sign($entity); # destructive
+    $returncode == 0
+      or die "$mg got error:\n".join("",@{$$mg{last_message}})."\n ";
 }
 
+our $out= do {
+    if ($maybe_outfile) {
+	xopen_write $maybe_outfile
+    } else {
+	bless *STDOUT{IO},"Chj::IO::File"
+    }
+};
+$out->xprint($entity->as_string);
+$out->xclose;
+
 #use Chj::ruse;
-use Chj::Backtrace;
-use Chj::repl; repl;
+#use Chj::Backtrace;
+#use Chj::repl; repl;
