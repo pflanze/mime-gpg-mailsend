@@ -88,6 +88,13 @@ our $from=
    or
    mailfrom);
 
+##hmmm. should the following *also* make it into a mail module???
+use Chj::Chomp;
+use Chj::Xbacktick;
+our $date=
+  ($headers->decodedheader("date")
+   or
+   Chomp(Xbacktick("date -R")));
 
 # ---- read body and combine with head ----------
 
@@ -109,6 +116,8 @@ our $entity= MIME::Entity->build
 	 $_ ne "message-id"
 	 and
 	 $_ ne "from"
+	 and
+	 $_ ne "date"
 	)
     }
     sort keys %{$headers->headersHash} #yep sort order plays a role
@@ -116,6 +125,7 @@ our $entity= MIME::Entity->build
    'Return-path'=> $return_path,
    'Message-id'=> $messageid,
    'From'=> $from,
+   'Date'=> $date,
    #Data     => [ "Hiho, a nice encrypted mail" ],
    Data=> $bfh->xcontent, #ok? why array?.
    Encoding => "quoted-printable",
