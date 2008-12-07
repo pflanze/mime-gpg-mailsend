@@ -68,11 +68,11 @@ our $entity= MIME::Entity->build
   );
 
 
-
+if(0){
 our $returncode = $mg->mime_sign($entity); # destructive
 $returncode == 0
   or die "$mg got error:\n".join("",@{$$mg{last_message}})."\n ";
-
+}
 
 #use Chj::ruse;
 use Chj::Backtrace;
