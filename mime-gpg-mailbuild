@@ -36,6 +36,7 @@ sub usage {
   -s | --sign  clearsign the given text in pgp/mime format.
   -2           expect two separate infiles, headers and body. The
                outfile argument becomes the third argument in this case.
+  --no-bcc     do not add from address to a Bcc header
 
   (See also: send_as_mail, mime-parser, (mime-worddecoder),
   Chj::Mail::SimpleHead, .. -- actually using Chj::Mail::SimpleHead here)
@@ -49,10 +50,14 @@ use Getopt::Long;
 our $verbose=0;
 our $opt_sign;
 our $opt_2;
+our $opt_bcc=1;
 GetOptions("verbose"=> \$verbose,
 	   "help"=> sub{usage},
 	   "sign"=>\$opt_sign,
 	   "2"=> \$opt_2,
+	   "no-bcc"=> sub {
+	       $opt_bcc=0
+	   },
 	   ) or exit 1;
 usage unless @ARGV>=1 and @ARGV<=3;
 
@@ -122,6 +127,19 @@ our $date=
    or
    Chomp(Xbacktick("date -R")));
 
+
+our $bcc= do {
+    if ($opt_bcc) {
+	if (my $h= $headers->decodedheader("bcc")) {
+	    "$h; $from" #ok?
+	} else {
+	    $from
+	}
+    } else {
+	$headers->decodedheader("bcc")
+    }
+};
+
 # ---- read body and combine with head ----------
 
 use MIME::Entity;
@@ -142,6 +160,8 @@ our $entity= MIME::Entity->build
 	 $_ ne "from"
 	 and
 	 $_ ne "date"
+	 and
+	 $_ ne "bcc"
 	)
     }
     sort keys %{$headers->headersHash} #yep sort order plays a role
@@ -150,6 +170,7 @@ our $entity= MIME::Entity->build
    'Message-id'=> $messageid,
    'From'=> $from,
    'Date'=> $date,
+   ($bcc ? ('Bcc' => $bcc) : ()),
    #Data     => [ "Hiho, a nice encrypted mail" ],
    Data=> $body,
    Encoding => "quoted-printable",
