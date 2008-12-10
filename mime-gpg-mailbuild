@@ -101,10 +101,18 @@ our $messageid=
    Create_messageid ($return_path));
 
 use Chj::Mailfrom qw(mailfrom);
+use Chj::Hostname 'hostname';
+sub hoststripped_mailfrom () {
+    my $h=hostname;
+    my $m= mailfrom;
+    $m=~ s/-$h\@/\@/;
+    $m
+}
+
 our $from=
   ($headers->decodedheader("from")
    or
-   mailfrom);
+   hoststripped_mailfrom);
 
 ##hmmm. should the following *also* make it into a mail module???
 use Chj::Chomp;
