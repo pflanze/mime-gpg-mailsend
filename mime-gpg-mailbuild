@@ -5,11 +5,6 @@
 
 use strict;
 
-our $key_id= undef;
-# undef means, it will expect a default key to be configured in your
-# .gnupg/gpg.conf
-
-
 my ($mydir, $myname);
 BEGIN {
     use Chj::xrealpath;
@@ -17,6 +12,14 @@ BEGIN {
     $0=~ /(.*?)([^\/]+)\z/s or die "?";
     ($mydir, $myname)=($1,$2);
 }
+
+our $key_id= undef;
+# undef means, it will expect a default key to be configured in your
+# .gnupg/gpg.conf
+
+our $sendmailserverpath= $ENV{HOME}."/.$myname.sendmailserver";
+our @sendmailcmd= qw(/usr/sbin/sendmail -t -oi);
+
 
 sub usage {
     print STDERR map{"$_\n"} @_ if @_;
@@ -37,6 +40,12 @@ sub usage {
   -2           expect two separate infiles, headers and body. The
                outfile argument becomes the third argument in this case.
   --no-bcc     do not add from address to a Bcc header
+  --sendmail   send mail by ssh'ing into the server given in
+               $sendmailserverpath and piping to @sendmailcmd,
+               or if that file doesn't exist, the same command locally.
+  --dry{,-run} remove 'Bcc' and 'Cc' headers and replace 'To' with the
+               from address
+  --dry-sendmail  combination of --sendmail and --dry-run flags
 
   (See also: send_as_mail, mime-parser, (mime-worddecoder),
   Chj::Mail::SimpleHead, .. -- actually using Chj::Mail::SimpleHead here)
@@ -51,12 +60,20 @@ our $verbose=0;
 our $opt_sign;
 our $opt_2;
 our $opt_bcc=1;
+our ($opt_sendmail,$opt_dry);
 GetOptions("verbose"=> \$verbose,
 	   "help"=> sub{usage},
 	   "sign"=>\$opt_sign,
 	   "2"=> \$opt_2,
 	   "no-bcc"=> sub {
 	       $opt_bcc=0
+	   },
+	   "sendmail"=>\$opt_sendmail,
+	   "dry"=> \$opt_dry,
+	   "dry-run"=> \$opt_dry,
+	   "dry-sendmail"=> sub {
+	       $opt_sendmail=1;
+	       $opt_dry=1;
 	   },
 	   ) or exit 1;
 usage unless @ARGV>=1 and @ARGV<=3;
@@ -140,6 +157,13 @@ our $bcc= do {
     }
 };
 
+
+our $cc=
+  $headers->decodedheader("cc");
+our $to=
+  $headers->decodedheader("to");
+
+
 # ---- read body and combine with head ----------
 
 use MIME::Entity;
@@ -162,6 +186,10 @@ our $entity= MIME::Entity->build
 	 $_ ne "date"
 	 and
 	 $_ ne "bcc"
+	 and
+	 $_ ne "cc"
+	 and
+	 $_ ne "to"
 	)
     }
     sort keys %{$headers->headersHash} #yep sort order plays a role
@@ -170,7 +198,17 @@ our $entity= MIME::Entity->build
    'Message-id'=> $messageid,
    'From'=> $from,
    'Date'=> $date,
-   ($bcc ? ('Bcc' => $bcc) : ()),
+   ($opt_dry ?
+    (
+     (To=> $from),
+    )
+    :
+    (
+     ($to ? (To=> $to) : ()),
+     ($cc ? (Cc=> $cc) : ()),
+     ($bcc ? (Bcc=> $bcc) : ()),
+    )
+   ),
    #Data     => [ "Hiho, a nice encrypted mail" ],
    Data=> $body,
    Encoding => "quoted-printable",
@@ -190,15 +228,27 @@ if ($opt_sign) {
       or die "$mg got error:\n".join("",@{$$mg{last_message}})."\n ";
 }
 
+use Chj::IO::Command;
 our $out= do {
     if ($maybe_outfile) {
 	xopen_write $maybe_outfile
+    } elsif ($opt_sendmail) {
+	if (-f $sendmailserverpath) {
+	    my $sendmailserver= Chomp(xopen_read($sendmailserverpath)->xreadline);
+	    Chj::IO::Command->new_receiver
+	      ("ssh",
+	       $sendmailserver,
+	       @sendmailcmd);
+	} else {
+	    Chj::IO::Command->new_receiver
+		(@sendmailcmd);
+	}
     } else {
 	bless *STDOUT{IO},"Chj::IO::File"
     }
 };
 $out->xprint($entity->as_string);
-$out->xclose;
+$out->xxfinish;
 
 #use Chj::ruse;
 #use Chj::Backtrace;
