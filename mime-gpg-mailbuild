@@ -36,7 +36,7 @@ sub usage {
   NOTE: header handling might not be unicode or even latin1 ready yet.
 
   Options:
-  -s | --sign  clearsign the given text in pgp/mime format.
+  --sign  clearsign the given text in pgp/mime format.
   -2           expect two separate infiles, headers and body. The
                outfile argument becomes the third argument in this case.
   --no-bcc     do not add from address to a Bcc header
