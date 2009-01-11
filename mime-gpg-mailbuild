@@ -262,18 +262,6 @@ our $entity= MIME::Entity->build
   );
 
 
-if ($opt_sign) {
-
-    # ---- sign ----------------------
-    use lib "$mydir/lib";# my hacked version of Mail::GnuPG
-    use CHJ::Mail::GnuPG;
-    our $mg = CHJ::Mail::GnuPG->new (key=> $key_id);
-
-    our $returncode = $mg->mime_sign($entity); # destructive
-    $returncode == 0
-      or die "$mg got error:\n".join("",@{$$mg{last_message}})."\n ";
-}
-
 sub attach_disposition ($$) {
     my ($vals,$disposition)=@_;
     my ($path,$mime_type)=@$vals; ##keep in sync with above ~sgh~
@@ -299,6 +287,19 @@ for (@attach_inline) {
 }
 for (@attach_attachment) {
     attach_disposition ($_, "attachment")
+}
+
+
+if ($opt_sign) {
+
+    # ---- sign ----------------------
+    use lib "$mydir/lib";# my hacked version of Mail::GnuPG
+    use CHJ::Mail::GnuPG;
+    our $mg = CHJ::Mail::GnuPG->new (key=> $key_id);
+
+    our $returncode = $mg->mime_sign($entity); # destructive
+    $returncode == 0
+      or die "$mg got error:\n".join("",@{$$mg{last_message}})."\n ";
 }
 
 
