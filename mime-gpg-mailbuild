@@ -209,9 +209,9 @@ our @attach_attachment= get_attach_from_headers ("attach-attachment");
 
 use MIME::Entity;
 
-our $entity= MIME::Entity->build
+
+our @passed_through_headers=
   (
-   (
     map {
 	defined (my $value= $headers->decodedheader ($_))
 	  or die "??";#well, multiheader cases maybe?.
@@ -239,7 +239,12 @@ our $entity= MIME::Entity->build
 	)
     }
     sort keys %{$headers->headersHash} #yep sort order plays a role
-   ),
+  );
+use Chj::repl;repl;
+
+our $entity= MIME::Entity->build
+  (
+   @passed_through_headers,
    'Return-path'=> $return_path,
    'Message-id'=> $messageid,
    'From'=> $from,
