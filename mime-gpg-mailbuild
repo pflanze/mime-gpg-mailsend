@@ -298,7 +298,8 @@ for (@attach_attachment) {
 if ($opt_sign) {
 
     # ---- sign ----------------------
-    use lib "$mydir/lib";# my hacked version of Mail::GnuPG
+    # using my hacked version of Mail::GnuPG
+    use lib "$mydir";
     use CHJ::Mail::GnuPG;
     our $mg = CHJ::Mail::GnuPG->new (key=> $key_id);
 
