@@ -966,6 +966,8 @@ GNU General Public License or the Artistic License for more details.
 
 Robert Spier
 
+David Bremner <ddb@cpan.org>
+
 =head1 BUGS/ISSUES/PATCHES
 
 Please send all bugs/issues/patches to
