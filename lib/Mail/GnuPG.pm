@@ -119,9 +119,9 @@ sub decrypt {
 	m!application/pgp-encrypted!;
     $ciphertext = $message->parts(1)->stringify_body;
   }
-  elsif ($message->body_as_string
+  elsif ($message->bodyhandle->as_string
 	 =~ m!^-----BEGIN PGP MESSAGE-----!m ) {
-    $ciphertext = $message->body_as_string;
+    $ciphertext = $message->bodyhandle->as_string;
     $armor_message = 1;
   }
   else {
@@ -233,9 +233,9 @@ sub get_decrypt_key {
 	m!application/pgp-encrypted!;
     $ciphertext = $message->parts(1)->stringify_body;
   }
-  elsif ($message->body_as_string
+  elsif ($message->bodyhandle->as_string
 	 =~ m!^-----BEGIN PGP MESSAGE-----!m ) {
-    $ciphertext = $message->body_as_string;
+    $ciphertext = $message->bodyhandle->as_string;
   }
   else {
     die "Unknown Content-Type or no PGP message in body"
