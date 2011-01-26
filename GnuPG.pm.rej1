@@ -1,0 +1,17 @@
+*************** sub mime_sign {
+*** 521,527 ****
+  				     passphrase => $passphrase_fh,
+  				     status     => $status_fh,
+  				   );
+-   my $pid = $gnupg->detach_sign( handles => $handles );
+    die "NO PASSPHRASE" unless defined $passphrase_fh;
+  
+    # this passes in the plaintext
+--- 527,533 ----
+  				     passphrase => $passphrase_fh,
+  				     status     => $status_fh,
+  				   );
++   my $pid = $gnupg->detach_sign( handles => $handles, $self->_agent_args );
+    die "NO PASSPHRASE" unless defined $passphrase_fh;
+  
+    # this passes in the plaintext
