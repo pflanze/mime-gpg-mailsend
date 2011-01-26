@@ -1,0 +1,8 @@
+munpack/ contains the files as created by mpack 1.6-5 (Debian
+stable). For some unknown reason, this doesn't work.
+
+test/munpack$ gpg part1
+Detached signature.
+Please enter name of data file: part1.desc
+gpg: Signature made Wed 26 Jan 2011 01:12:35 AM EST using DSA key ID 1FE692DA
+gpg: BAD signature from "Christian Jaeger <cj@christianjaeger.ch>"
