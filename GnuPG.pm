@@ -542,24 +542,16 @@ sub mime_sign {
 #  warn($entity->as_string);
 #  print STDERR $plaintext;
 #  print "<----\n";
-  my $read = _communicate([$output, $error, $status_fh],
-                        [$input, $passphrase_fh],
-                        { $input => $plaintext,
-                          $passphrase_fh => $self->{passphrase}}
-             );
+  $gpg_out->xprint ($plaintext);
+  my $return= $gpg_out->xfinish;
 
-  my @signature  = split(/^/m, $read->{$output});
-  my @error_output = split(/^/m, $read->{$error});
-  my @status_info  = split(/^/m, $read->{$status_fh});
-
-  waitpid $pid, 0;
-  my $return = $?;
-   $return = 0 if $return == -1;
+  my @signature  = <$gpgoutputfile>;
+  $gpgoutputfile->xclose;
 
   my $exit_value  = $return >> 8;
 
 
-  $self->{last_message} = \@error_output;
+  #$self->{last_message} = \@error_output;   we don't have this anymore
 
   $entity->attach( Type => "application/pgp-signature",
 		   Disposition => "inline",
