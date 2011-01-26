@@ -1,0 +1,335 @@
+#!/usr/bin/perl -w
+
+# Sat Dec  6 18:56:25 CET 2008
+(my $email='christian-novo%jaeger,mine,nu')=~ tr/%,/@./;
+
+use strict;
+
+my ($mydir, $myname);
+BEGIN {
+    use Chj::xrealpath;
+    $0= xrealpath $0;
+    $0=~ /(.*?)([^\/]+)\z/s or die "?";
+    ($mydir, $myname)=($1,$2);
+}
+
+our $key_id= undef;
+# undef means, it will expect a default key to be configured in your
+# .gnupg/gpg.conf
+
+our $sendmailserverpath= $ENV{HOME}."/.$myname.sendmailserver";
+our @sendmailcmd= qw(/usr/sbin/sendmail -t -oi);
+
+
+sub usage {
+    print STDERR map{"$_\n"} @_ if @_;
+    print "$myname infile [ outfile ]
+
+  create mime message from given headers and body, optionally signing
+  the body in pgp/mime format.  It completes the headers with
+  return-path, from, and message-id headers if those are not present
+  in the given headers file.
+
+  If no outfile is given, prints to stdout.
+
+  Kind-of replaces send_as_mail.
+  NOTE: header handling might not be unicode or even latin1 ready yet.
+
+  Options:
+  --sign  clearsign the given text in pgp/mime format.
+  -2           expect two separate infiles, headers and body. The
+               outfile argument becomes the third argument in this case.
+  --no-bcc     do not add from address to a Bcc header
+  --sendmail   send mail by ssh'ing into the server given in
+               $sendmailserverpath and piping to @sendmailcmd,
+               or if that file doesn't exist, the same command locally.
+  --dry{,-run} remove 'Bcc' and 'Cc' headers and replace 'To' with the
+               from address
+  --dry-sendmail  combination of --sendmail and --dry-run flags
+
+  (See also: send_as_mail, mime-parser, (mime-worddecoder),
+  Chj::Mail::SimpleHead, .. -- actually using Chj::Mail::SimpleHead here)
+
+  NOTE: pseudoheaders getting special treatment:
+   attach-inline: path   add file as inline attachment
+   attach-attachment: path   add file as 'Disposition: attachment' attachment
+
+  (Christian Jaeger <$email>)
+";
+exit (@_ ? 1 : 0);
+}
+
+use Getopt::Long;
+our $verbose=0;
+our $opt_sign;
+our $opt_2;
+our $opt_bcc=1;
+our ($opt_sendmail,$opt_dry);
+GetOptions("verbose"=> \$verbose,
+	   "help"=> sub{usage},
+	   "sign"=>\$opt_sign,
+	   "2"=> \$opt_2,
+	   "no-bcc"=> sub {
+	       $opt_bcc=0
+	   },
+	   "sendmail"=>\$opt_sendmail,
+	   "dry"=> \$opt_dry,
+	   "dry-run"=> \$opt_dry,
+	   "dry-sendmail"=> sub {
+	       $opt_sendmail=1;
+	       $opt_dry=1;
+	   },
+	   ) or exit 1;
+usage unless @ARGV>=1 and @ARGV<=3;
+
+our ($headersfile,$maybe_bodyfile,$maybe_outfile);
+if ($opt_2) {
+    @ARGV>=2 and @ARGV<=3 or usage;
+    ($headersfile,$maybe_bodyfile,$maybe_outfile)=@ARGV;
+} else {
+    @ARGV>=1 and @ARGV<=2 or usage;
+    ($headersfile,$maybe_outfile)=@ARGV;
+}
+
+
+# ---- head data ----------------
+
+use Chj::Mail::SimpleHead;
+use Chj::xopen ':all';
+
+our $m= xopen_read $headersfile;
+our $headers=Chj::Mail::SimpleHead->new_from_fh ($m);
+our $body= do {
+    my $rest= $m->xcontent;
+    if ($opt_2) {
+	(!defined $rest)
+	  or $rest=~ /^\s*\z/s
+	    or die "rest of '$headersfile' is supposed to be empty, but isn't: '$rest'";
+	my $in= xopen_read $maybe_bodyfile;
+	my $rf= $in->xcontentref;
+	$in->xclose;
+	$$rf
+    } else {
+	$rest
+    }
+};
+
+use Chj::Mail::Return_path;
+our $return_path=
+  ($headers->decodedheader("return-path")
+   or
+   Return_path($headers->decodedheader("from")));
+
+use Chj::Mail::Create_messageid;
+our $messageid=
+  ($headers->decodedheader("message-id") #hm or would we want to override it?
+   or
+   Create_messageid ($return_path));
+
+use Chj::Mailfrom qw(mailfrom);
+use Chj::Hostname 'hostname';
+sub hoststripped_mailfrom () {
+    my $h=hostname;
+    my $m= mailfrom;
+    $m=~ s/-$h\@/\@/;
+    $m
+}
+
+our $from=
+  ($headers->decodedheader("from")
+   or
+   hoststripped_mailfrom);
+
+##hmmm. should the following *also* make it into a mail module???
+use Chj::Chomp;
+use Chj::Xbacktick;
+our $date=
+  ($headers->decodedheader("date")
+   or
+   Chomp(Xbacktick("date -R")));
+
+
+our $bcc= do {
+    if ($opt_bcc) {
+	if (my $h= $headers->decodedheader("bcc")) {
+	    "$h; $from" #ok?
+	} else {
+	    $from
+	}
+    } else {
+	$headers->decodedheader("bcc")
+    }
+};
+
+
+our $cc=
+  $headers->decodedheader("cc");
+our $to=
+  $headers->decodedheader("to");
+
+
+use Chj::xperlfunc ':all'; #qw(xstat basename);
+use Chj::IO::Command;
+sub file_mime_info ($$) {
+    my ($path,$kind)=@_;
+    my $cmd= Chj::IO::Command->new_sender ("file","-b",$kind, "--",$path);
+    my $result= $cmd->xreadline; chomp $result;
+    $cmd->xxfinish;
+    $result
+}
+sub get_attach_from_headers ($) {
+    my ($headersname)=@_;
+    map {
+	my $path=$_->value;
+	my $s= xstat $path;
+	$s->is_file
+	  or die "path is not a file: '$path'";
+	#hm. type guessing     ?.sigh.
+	# file tool. but how to get at mime types. ah WOW it has a --mime-type option!
+	#chris@novo:~$ file -b --mime 'hmwel. (Ist dasnunReklame.?) Screenshot-Dunkelziffer EV - Tentacles.mp4 - SMPlayer-1.png'
+	#image/png
+	#chris@novo:~$ file -b --mime 'sec_key.asc'
+	#text/plain charset=us-ascii
+	#chris@novo:~$ file -b --mime-type 'sec_key.asc'
+	#text/plain
+	#chris@novo:~$ file -b --mime-encoding 'sec_key.asc'
+	#binary
+	[
+	 $path,
+	 file_mime_info ($path,"--mime-type"),
+	 #file_mime_info ($path,"--mime-encoding"),  i dunno.
+	]
+    } $headers->headers($headersname);
+}
+our @attach_inline= get_attach_from_headers ("attach-inline");
+our @attach_attachment= get_attach_from_headers ("attach-attachment");
+
+
+# ---- read body and combine with head ----------
+
+use MIME::Entity;
+
+
+our @passed_through_headers=
+  (
+    map {
+	defined (my $value= $headers->decodedheader ($_))
+	  or die "??";#well, multiheader cases maybe?.
+	($_, $value)
+    }
+    grep {
+	($_ ne "return-path"
+	 and
+	 $_ ne "message-id"
+	 and
+	 $_ ne "from"
+	 and
+	 $_ ne "date"
+	 and
+	 $_ ne "bcc"
+	 and
+	 $_ ne "cc"
+	 and
+	 $_ ne "to"
+	 #hm interesting these seem to be filtered out anyway ("Attach:" at least), but still better be safe:
+	 and
+	 $_ ne "attach-inline"
+	 and
+	 $_ ne "attach-attachment"
+	)
+    }
+    sort keys %{$headers->headersHash} #yep sort order plays a role
+  );
+#use Chj::repl;repl;
+
+our $entity= MIME::Entity->build
+  (
+   @passed_through_headers,
+   'Return-path'=> $return_path,
+   'Message-id'=> $messageid,
+   'From'=> $from,
+   'Date'=> $date,
+   ($opt_dry ?
+    (
+     (To=> $from),
+    )
+    :
+    (
+     ($to ? (To=> $to) : ()),
+     ($cc ? (Cc=> $cc) : ()),
+     ($bcc ? (Bcc=> $bcc) : ()),
+    )
+   ),
+   #Data     => [ "Hiho, a nice encrypted mail" ],
+   Data=> $body,
+   Encoding => "quoted-printable",
+   Charset  => "iso-8859-1",###?todo.
+  );
+
+
+sub attach_disposition ($$) {
+    my ($vals,$disposition)=@_;
+    my ($path,$mime_type)=@$vals; ##keep in sync with above ~sgh~
+#     my $ent= MIME::Entity->build
+#       (Type=> $mime_type,
+#        # Encoding=> "base64" well  let the lib choose  ?
+#        Path=> $path,
+#        Filename=> basename($path), #ok to tell that?
+#        Disposition => "attachment");
+    #hm but there was an attach method ?
+    #morethanonewaytodoit?  hm or not? or yes??.!.
+    $entity->attach
+      (Type=> $mime_type,
+       # Encoding=> "base64" well  let the lib choose  ?
+       Path=> $path,
+       Filename=> basename($path), #ok to tell that?
+       # actually we still want this, the default is 'inline' it seems!:
+       Disposition => $disposition,
+      );
+}
+for (@attach_inline) {
+    attach_disposition ($_, "inline")
+}
+for (@attach_attachment) {
+    attach_disposition ($_, "attachment")
+}
+
+
+if ($opt_sign) {
+
+    # ---- sign ----------------------
+    use lib "$mydir/lib";# my hacked version of Mail::GnuPG
+    use CHJ::Mail::GnuPG;
+    our $mg = CHJ::Mail::GnuPG->new (key=> $key_id);
+
+    our $returncode = $mg->mime_sign($entity); # destructive
+    $returncode == 0
+      or die "$mg got error:\n".join("",@{$$mg{last_message}})."\n ";
+}
+
+
+use Chj::IO::Command;
+our $out= do {
+    if ($maybe_outfile) {
+	xopen_write $maybe_outfile
+    } elsif ($opt_sendmail) {
+	if (-f $sendmailserverpath) {
+	    my $sendmailserver= Chomp(xopen_read($sendmailserverpath)->xreadline);
+	    Chj::IO::Command->new_receiver
+	      ("ssh",
+	       $sendmailserver,
+	       @sendmailcmd);
+	} else {
+	    Chj::IO::Command->new_receiver
+		(@sendmailcmd);
+	}
+    } else {
+	bless *STDOUT{IO},"Chj::IO::File"
+    }
+};
+$out->xprint($entity->as_string);
+$out->xxfinish;
+
+#use Chj::ruse;
+#use Chj::Backtrace;
+#use Chj::repl; repl;
