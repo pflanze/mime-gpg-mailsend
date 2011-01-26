@@ -495,6 +495,10 @@ sub has_public_key {
 =cut
 
 
+
+use Chj::xtmpfile ();
+use Chj::IO::Command;
+
 sub mime_sign {
   my ($self,$entity) = @_;
 
@@ -510,19 +514,14 @@ sub mime_sign {
     $entity->add_part($workingentity);
   }
 
-  my $gnupg = GnuPG::Interface->new();
-  $self->_set_options( $gnupg );
-  my ( $input, $output, $error, $passphrase_fh, $status_fh )
-    = ( new IO::Handle, new IO::Handle,new IO::Handle,
-	new IO::Handle,new IO::Handle,);
-  my $handles = GnuPG::Handles->new( stdin      => $input,
-				     stdout     => $output,
-				     stderr     => $error,
-				     passphrase => $passphrase_fh,
-				     status     => $status_fh,
-				   );
-  my $pid = $gnupg->detach_sign( handles => $handles );
-  die "NO PASSPHRASE" unless defined $passphrase_fh;
+  my $gpgoutputfile= Chj::xtmpfile::xtmpfile;
+  my $gpg_out= Chj::IO::Command->new_receiver
+    ("gpg",
+     "--clearsign",
+     ($$self{key} ? ("--local-user",$$self{key}) : ()),
+     "--output", $gpgoutputfile->path,
+     "-",
+    );
 
   # this passes in the plaintext
   my $plaintext;
